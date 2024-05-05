@@ -460,13 +460,13 @@ async function main() {
     );
   }
 
-  console.log("Distribution for late scripts: ");
+  console.log("Distribution for late requests: ");
   console.log(resourceTypeCountLS);
-  console.log("Distribution for important scripts: ");
+  console.log("Distribution for important requests: ");
   console.log(resourceTypeCountIS);
-  console.log("Distribution for priority changed scripts: ");
+  console.log("Distribution for priority changed requests: ");
   console.log(resourceTypeCountPCS);
-  console.log("Distribution for render blocking scripts: ");
+  console.log("Distribution for render blocking requests: ");
   console.log(resourceTypeCountRBS);
 }
 
