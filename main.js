@@ -15,6 +15,12 @@ async function getFileNames(dirName) {
   return data;
 }
 
+// The resource type of all the late requests and their count are stored in this variable
+let resourceTypeCountLS = {};
+let resourceTypeCountPCS = {};
+let resourceTypeCountIS = {};
+let resourceTypeCountRBS = {};
+
 function getInitTS(data) {
   let initTS = -1;
 
@@ -76,6 +82,7 @@ function getCriticalResources(data, lcpTS) {
         end: null,
         firstReceivedData: null,
         url: event["args"]["data"]["url"],
+        resourceType: event["args"]["data"]["resourceType"],
         fromCache: false,
         priority: event["args"]["data"]["priority"],
         priorityChanged: false,
@@ -132,7 +139,6 @@ function getCriticalResources(data, lcpTS) {
   let cachedCount = 0;
   let maxDuration = 0;
   let maxReqStartTime;
-  let longestReq = {};
 
   for (let rId in requests) {
     if (requests[rId]["fromCache"]) cachedCount++;
@@ -167,6 +173,24 @@ function getCriticalResources(data, lcpTS) {
       }
     }
   }
+  // This variable contains input and output files related to distribution
+  let distIO = [
+    [lateStartedScripts, resourceTypeCountLS],
+    [priorityChangedScripts, resourceTypeCountPCS],
+    [renderBlockingScripts, resourceTypeCountRBS],
+    [impScripts, resourceTypeCountIS],
+  ];
+
+  // Calculate the resource type distribution
+  distIO.forEach((entry) => {
+    entry[0].forEach((r) => {
+      if (!(r["resourceType"] in entry[1])) {
+        entry[1][r["resourceType"]] = 1;
+      } else {
+        entry[1][r["resourceType"]]++;
+      }
+    });
+  });
 
   // console.log(`Total no. of requests: ${Object.keys(requests).length}`);
   // console.log(`Total no. of cached requests: ${cachedCount}`);
@@ -343,7 +367,7 @@ function renderText(siteURL, m) {
       continue;
     }
 
-    // Sort the results based to time to receive first data
+    // Sort the results based on time to receive first data
     let data = reqInfo[req]["data"];
     data.sort((a, b) => {
       let aDiff = convertTSToTimeInSec(a.firstReceivedData - a.start);
@@ -435,6 +459,15 @@ async function main() {
       `=========================================================================\n`
     );
   }
+
+  console.log("Distribution for late scripts: ");
+  console.log(resourceTypeCountLS);
+  console.log("Distribution for important scripts: ");
+  console.log(resourceTypeCountIS);
+  console.log("Distribution for priority changed scripts: ");
+  console.log(resourceTypeCountPCS);
+  console.log("Distribution for render blocking scripts: ");
+  console.log(resourceTypeCountRBS);
 }
 
 main();
