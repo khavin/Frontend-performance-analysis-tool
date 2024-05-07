@@ -17,8 +17,11 @@ async function getFileNames(dirName) {
 
 // The resource type of all the late requests and their count are stored in this variable
 let resourceTypeCountLS = {};
+// The resource type of priority changed late requests
 let resourceTypeCountPCS = {};
+// The resource type of important late requests
 let resourceTypeCountIS = {};
+// The resource type of render blocking late requests
 let resourceTypeCountRBS = {};
 
 function getInitTS(data) {
@@ -49,6 +52,9 @@ function getSiteURL(data) {
   return "";
 }
 
+// This function goes through the trace data to find an event with the given key and
+// return its timestamp. The variable first decides whether to return the first event with
+// the given name or vice versa.
 function getNameValue(key, first, data) {
   let ts = -1;
 
@@ -91,7 +97,9 @@ function getCriticalResources(data, lcpTS) {
       };
     }
 
+    // Request ID
     let currReqId;
+
     // Get timeline events
     if (
       "args" in event &&
@@ -122,6 +130,7 @@ function getCriticalResources(data, lcpTS) {
     }
   }
 
+  // Delete the requests which received data after LCP
   for (let rId in requests) {
     if (requests[rId]["firstReceivedData"] === null) {
       delete requests[rId];
@@ -141,12 +150,14 @@ function getCriticalResources(data, lcpTS) {
   let maxReqStartTime;
 
   for (let rId in requests) {
+    // Check if the request is loaded from a cache
     if (requests[rId]["fromCache"]) cachedCount++;
 
+    // Only process if the request is late. Here we are checking if the request was
+    // initiated after the end time of the initial HTML document.
     if (requests[rId]["start"] > firstEnd) {
-      // Note down the min and max timestamps in the late requests
-      // This will be used to calculate the minimum amount of time lost
-
+      // This logic is used to identify the request which is taking the longest
+      // time. This particular metric is not used in the report as of now.
       if (
         !["Low", "veryLow"].includes(requests[rId]["priority"]) &&
         maxDuration <
@@ -160,14 +171,17 @@ function getCriticalResources(data, lcpTS) {
 
       lateStartedScripts.push(requests[rId]);
 
+      // Check if the request priority changed
       if (requests[rId]["priorityChanged"]) {
         priorityChangedScripts.push(requests[rId]);
       }
 
+      // Check if the request is render blocking
       if (requests[rId]["renderBlocking"] === "blocking") {
         renderBlockingScripts.push(requests[rId]);
       }
 
+      // Check if the request is important (Very High, High, Medium priority)
       if (!["Low", "veryLow"].includes(requests[rId]["priority"])) {
         impScripts.push(requests[rId]);
       }
@@ -191,6 +205,8 @@ function getCriticalResources(data, lcpTS) {
       }
     });
   });
+
+  // Uncomment during debugging
 
   // console.log(`Total no. of requests: ${Object.keys(requests).length}`);
   // console.log(`Total no. of cached requests: ${cachedCount}`);
@@ -227,6 +243,7 @@ function getCriticalResources(data, lcpTS) {
   };
 }
 
+// Use this function to go through the timeline of a request (use it for debugging)
 function printRequestTimeLine(data, reqId) {
   // Get initial timestamp
   let initTS = getInitTS(data);
@@ -276,9 +293,8 @@ async function getMetrics(fileName) {
 
     let criticalMetrics = getCriticalResources(data, lcpTS);
 
-    // printRequestTimeLine(data, "5853.56");
-
-    // Debug for name property
+    // Debug for name property. Use the below piece of logic to identify
+    // different event types present in the trace data
 
     // Group by different types of trace logs
     // let names = {};
@@ -289,21 +305,6 @@ async function getMetrics(fileName) {
     //   }
     //   names[event["name"]]++;
     // });
-
-    // names = Object.entries(names).sort((a, b) => -(a[1] - b[1]));
-    // await fs.writeFile("./names.json", JSON.stringify(names, null, 4));
-
-    // console.log(`Site: ${siteURL}`);
-    // console.log(data["metadata"]["networkThrottling"]);
-    // console.log("================================================");
-    // console.log("First Paint Time: " + convertTSToTimeInSec(fPT) + "s");
-    // console.log(
-    //   "First Meaningful Paint Time: " + convertTSToTimeInSec(fMPT) + "s"
-    // );
-    // console.log(
-    //   "Largest Contentful Paint Time: " + convertTSToTimeInSec(lCPT) + "s"
-    // );
-    // console.log("\n");
 
     criticalMetrics["throttling"] = data["metadata"]["networkThrottling"];
     criticalMetrics["fPT"] = fPT;
@@ -316,6 +317,7 @@ async function getMetrics(fileName) {
   }
 }
 
+// This function is used to create the text for the report
 function renderText(siteURL, m) {
   let output = `URL tested: ${siteURL}`;
 
@@ -340,8 +342,6 @@ function renderText(siteURL, m) {
   output += `Total no. of render blocking requests: ${
     Object.keys(m.renderBlockingScripts).length
   }\n\n`;
-
-  //output += `Minimum time lost: ${m.minTimeLost}s\n\n`;
 
   let reqInfo = {
     renderBlockedReqs: {
